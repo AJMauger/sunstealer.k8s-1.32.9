@@ -1,0 +1,24 @@
+
+sudo dnf install samba
+
+sudo vi /etc/samba/smb.conf
+
+[global]
+   workgroup = AJM
+   security = user
+[ajm]
+   comment = ajm
+;  browseable = yes
+   path = /home/ajm
+   valid users = ajm
+   writable = yes
+   create mask = 0664 #rw-rw-r
+   directory mask = 0775 #rwxrwxr-x
+        
+# sudo firewall-cmd --permanent --add-service=samba
+# sudo firewall-cmd --reload
+# sudo setsebool -P samba_enable_home_dirs 1
+
+sudo systemctl enable --now nmb
+sudo systemctl enable --now smb
+sudo smbpasswd -a ajm

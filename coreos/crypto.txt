@@ -1,0 +1,49 @@
+#master:
+
+openssl genrsa -out ca-ajm.net.key 2048
+openssl req -x509 -new -nodes -key ca-ajm.net.key -sha256 -days 1825 -out ca-ajm.net.crt
+
+Country Name (2 letter code) [XX]:US
+State or Province Name (full name) []:CO
+Locality Name (eg, city) [Default City]:Denver
+Organization Name (eg, company) [Default Company Ltd]:ajm.net
+Organizational Unit Name (eg, section) []:Certificate Authority
+Common Name (eg, your name or your server's hostname) []:*.ajm.net
+Email Address []:adammauger@mail.com
+
+#install-cert:
+
+sudo cp ca-ajm.net.crt /etc/pki/ca-trust/source/anchors/.
+sudo update-ca-trust extract
+sudo update-ca-trust
+
+openssl genrsa -out tls.key 2048
+openssl req -new -key tls.key -addext "subjectAltName = DNS:*.ajm.net" -out tls.csr
+openssl req -in tls.csr -text -noout | grep DNS
+    DNS:ajmfco42-01.ajm.net
+openssl x509 -req -days 10000 -CA ca-ajm.net.crt -CAkey ca-ajm.net.key -CAcreateserial -in tls.csr -out tls.crt -extensions SAN -extfile <(cat /etc/ssl/openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:*.ajm.net")) -in tls.csr -out tls.crt
+
+# You are about to be asked to enter information that will be incorporated
+# into your certificate request.
+# What you are about to enter is what is called a Distinguished Name or a DN.
+# There are quite a few fields but you can leave some blank
+# For some fields there will be a default value,
+# If you enter '.', the field will be left blank.
+# -----
+# Country Name (2 letter code) [XX]:US
+# State or Province Name (full name) []:CO
+# Locality Name (eg, city) [Default City]:Denver
+# Organization Name (eg, company) [Default Company Ltd]:ajm.net
+# Organizational Unit Name (eg, section) []:docker-registry
+# Common Name (eg, your name or your server's hostname) []:ajmfco42-01.ajm.net
+# Email Address []:adammauger@mail.com
+# Please enter the following 'extra' attributes
+# to be sent with your certificate request
+# A challenge password []:
+# An optional company name []:
+
+openssl genrsa -out docker-registry.key 2048
+openssl req -new -key docker-registry.key -addext "subjectAltName = DNS:ajmfco42-01.ajm.net" -out docker-registry.csr
+openssl req -in docker-registry.csr -text -noout | grep DNS
+    DNS:ajmfco42-01.ajm.net
+openssl x509 -req -days 10000 -CA ca-ajm.net.crt -CAkey ca-ajm.net.key -CAcreateserial -in docker-registry.csr -out docker-registry.crt -extensions SAN -extfile <(cat /etc/ssl/openssl.cnf <(printf "\n[SAN]\nsubjectAltName=DNS:*.ajm.net")) -in docker-registry.csr -out docker-registry.crt

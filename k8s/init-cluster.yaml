@@ -1,0 +1,11 @@
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: v1.32.9
+controllerManager:
+  extraArgs:
+    flex-volume-plugin-dir: "/etc/kubernetes/kubelet-plugins/volume/exec"
+networking:
+  podSubnet: 10.244.0.0/16
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration

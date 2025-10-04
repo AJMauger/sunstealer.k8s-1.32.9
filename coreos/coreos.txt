@@ -1,0 +1,8 @@
+sudo coreos-installer install /dev/sda --ignition-url http://10.0.0.2/ajm.cluster/coreos_ajmfco42-01.ign.json --insecure-ignition
+
+sudo hostnamectl set-hostname --static ajmfco42-01.ajm.net
+sudo hostnamectl set-hostname --static ajmfco42-02.ajm.net
+sudo hostnamectl set-hostname --static ajmfco42-03.ajm.net
+sudo hostnamectl set-hostname --static ajmfco42-04.ajm.net
+
+sudo vi /etc/selinux/config

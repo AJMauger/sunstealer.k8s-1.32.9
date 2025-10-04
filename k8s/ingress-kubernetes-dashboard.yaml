@@ -1,0 +1,112 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-api
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "2"
+    konghq.com/rewrite: /api/$1
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-api
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-auth-csrftoken
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "4"
+    konghq.com/rewrite: /api/v1/csrftoken/$1
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/v1/csrftoken/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-auth
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-auth-login
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "3"
+    konghq.com/rewrite: /api/v1/login
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/v1/login(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-auth
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-web
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "1"
+    konghq.com/rewrite: /$1
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-web
+            port:
+              number: 8000

@@ -1,0 +1,254 @@
+export KUBE_EDITOR=vi
+
+# master:
+sudo rpm-ostree install kubelet kubeadm kubectl cri-o httpd-tools helm samba
+
+sudo mkdir /etc/kubernetes
+sudo mkdir /etc/kubernetes/pki
+sudo cp ./ca-ajm.net.key /etc/kubernetes/pki/ca.key
+sudo cp ./ca-ajm.net.crt /etc/kubernetes/pki/ca.crt
+
+# worker 
+sudo rpm-ostree install kubelet kubeadm cri-o
+
+# master + workers
+
+sudo reboot
+sudo systemctl enable --now crio kubelet
+
+# master:
+sudo kubeadm init --v=5 --config ./init-cluster.yaml
+
+# CNI =======================================================================================
+
+# master: 
+kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
+
+# kong ======================================================================================
+
+sudo mkdir /etc/secrets
+sudo mkdir /etc/secrets/kong-admin-tls
+sudo mkdir /etc/secrets/kong-mngr-tls
+sudo mkdir /etc/secrets/kong-proxy-tls
+sudo cp ~/tls.crt /etc/secrets/kong-admin-tls/tls.crt
+sudo cp ~/tls.key /etc/secrets/kong-admin-tls/tls.key
+sudo cp ~/tls.crt /etc/secrets/kong-mngr-tls/tls.crt
+sudo cp ~/tls.key /etc/secrets/kong-mngr-tls/tls.key
+sudo cp ~/tls.crt /etc/secrets/kong-proxy-tls/tls.crt
+sudo cp ~/tls.key /etc/secrets/kong-proxy-tls/tls.key
+
+# kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/experimental-install.yaml
+
+kubectl get crds | grep kong
+
+helm repo add kong https://charts.konghq.com
+helm repo update
+
+kubectl create namespace kong
+kubectl create secret tls kong-admin-tls --cert=tls.crt --key=tls.key -n kong
+kubectl create secret tls kong-mngr-tls --cert=tls.crt --key=tls.key -n kong
+kubectl create secret tls kong-proxy-tls --cert=tls.crt --key=tls.key -n kong
+
+# vi kic-values.yaml
+
+admin:
+  enabled: true
+  type: NodePort
+  tls:
+    enabled: true
+    nodePort: 31002
+
+ingressController:
+  enabled: true
+  env:
+    controller_log_level: "debug"
+    feature_gates: "RewriteURIs=true"
+
+manager:
+  enabled: true
+  type: NodePort
+  tls:
+    enabled: true
+    nodePort: 31003
+
+proxy:
+  enabled: true
+  secretName: kong-proxy-tls
+  type: NodePort
+  tls:
+    enabled: true
+    nodePort: 31001
+  parameters:
+    - http2
+
+secretVolumes:
+  - kong-admin-tls
+  - kong-mngr-tls
+  - kong-proxy-tls
+
+env:
+  admin_gui_url: https://ajmfco42-01.ajm.net:31003
+  admin_gui_api_url: https://ajmfco42-01.ajm.net:31002
+  admin_gui_session_conf: '{"secret":"1234567890-abcdef","storage":"kong","cookie_secure":true}'
+  admin_ssl_cert: /etc/secrets/kong-admin-tls/tls.crt
+  admin_ssl_cert_key: /etc/secrets/kong-admin-tls/tls.key
+  admin_gui_ssl_cert: /etc/secrets/kong-mngr-tls/tls.crt
+  admin_gui_ssl_cert_key: /etc/secrets/kong-mngr-tls/tls.key
+  ssl_cert: /etc/secrets/kong-proxy-tls/tls.crt
+  ssl_cert_key: /etc/secrets/kong-proxy-tls/tls.key
+
+# helm upgrade --install kic kong/kong --namespace kong --values kic-values.yaml
+
+kubectl logs -f -n kong kic-kong-XXX proxy
+kubectl logs -f -n kong kic-kong-XXX ingress-controller
+
+# dashboard =======================================================================================
+
+helm repo add kubernetes-dashboard https://kubernetes.github.io/dashboard/
+helm repo update
+
+helm upgrade --install kubernetes-dashboard kubernetes-dashboard/kubernetes-dashboard --namespace kubernetes-dashboard --create-namespace \
+--set kong.enabled=false
+
+kubectl create secret tls kong-proxy-tls --cert=tls.crt --key=tls.key -n kubernetes-dashboard
+
+kubectl create serviceaccount kubernetes-dashboard --namespace kubernetes-dashboard
+
+kubectl apply -n kubernetes-dashboard -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dashboard-secret
+  annotations:
+    kubernetes.io/service-account.name: kubernetes-dashboard
+type: kubernetes.io/service-account-token
+EOF
+
+kubectl create clusterrolebinding dashboard-admin -n kubernetes-dashboard  --clusterrole=cluster-admin  --serviceaccount=kubernetes-dashboard:kubernetes-dashboard
+ 
+kubectl create token --duration=87600h --namespace kubernetes-dashboard kubernetes-dashboard
+
+https://ajmfco42-01.ajm.net:31001/dashboard/api/v1/csrftoken/login
+
+curl -kv -X POST https://ajmfco42-01.ajm.net:31001/dashboard/api/v1/login \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer " \
+  -d '{"csrfToken":""}'
+
+# ingress =========================================================================================
+
+# vi ingress-kubernetes-dashboard.yaml
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-api
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "2"
+    konghq.com/rewrite: /api/$1
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-api
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-auth-csrftoken
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "4"
+    konghq.com/rewrite: /api/v1/csrftoken/$1
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/v1/csrftoken/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-auth
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-auth-login
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "3"
+    konghq.com/rewrite: /api/v1/login
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/v1/login(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-auth
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-web
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "1"
+    konghq.com/rewrite: /$1
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-web
+            port:
+              number: 8000

@@ -1,0 +1,45 @@
+admin:
+  enabled: true
+  type: NodePort
+  tls:
+    enabled: true
+    nodePort: 31002
+
+ingressController:
+  enabled: true
+  env:
+    controller_log_level: "debug"
+    feature_gates: "RewriteURIs=true"
+
+manager:
+  enabled: true
+  type: NodePort
+  tls:
+    enabled: true
+    nodePort: 31003
+
+proxy:
+  enabled: true
+  secretName: kong-proxy-tls
+  type: NodePort
+  tls:
+    enabled: true
+    nodePort: 31001
+  parameters:
+    - http2
+
+secretVolumes:
+  - kong-admin-tls
+  - kong-mngr-tls
+  - kong-proxy-tls
+
+env:
+  admin_gui_url: https://ajmfco42-01.ajm.net:31003
+  admin_gui_api_url: https://ajmfco42-01.ajm.net:31002
+  admin_gui_session_conf: '{"secret":"1234567890-abcdef","storage":"kong","cookie_secure":true}'
+  admin_ssl_cert: /etc/secrets/kong-admin-tls/tls.crt
+  admin_ssl_cert_key: /etc/secrets/kong-admin-tls/tls.key
+  admin_gui_ssl_cert: /etc/secrets/kong-mngr-tls/tls.crt
+  admin_gui_ssl_cert_key: /etc/secrets/kong-mngr-tls/tls.key
+  ssl_cert: /etc/secrets/kong-proxy-tls/tls.crt
+  ssl_cert_key: /etc/secrets/kong-proxy-tls/tls.key

@@ -1,0 +1,26 @@
+sudo systemctl enable sshd
+sudo systemctl start sshd
+
+sudo vi /etc/selinux/config SELINUX=disabled
+
+ssh-keygen -t rsa
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/ajm/.ssh/id_rsa): 
+Created directory '/home/ajm/.ssh'.
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/ajm/.ssh/id_rsa => ajmwin11-01 .ssh
+Your public key has been saved in /home/ajm/.ssh/id_rsa.pub => ajmwin11-01 .ssh
+The key fingerprint is:
+The key's randomart image is:
++---[RSA 3072]----+
++----[SHA256]-----+
+
+sudo dnf install butane mkpasswd samba 
+
+mkpasswd --method=yescrypt
+
+butane --pretty --strict coreos_ajmfco42-01.ign.txt > coreos_ajmfco42-01.ign.json
+butane --pretty --strict coreos_ajmfco42-02.ign.txt > coreos_ajmfco42-02.ign.json
+butane --pretty --strict coreos_ajmfco42-03.ign.txt > coreos_ajmfco42-03.ign.json
+butane --pretty --strict coreos_ajmfco42-04.ign.txt > coreos_ajmfco42-04.ign.json
