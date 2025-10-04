@@ -129,7 +129,7 @@ kubectl create clusterrolebinding dashboard-admin -n kubernetes-dashboard  --clu
  
 kubectl create token --duration=87600h --namespace kubernetes-dashboard kubernetes-dashboard
 
-https://ajmfco42-01.ajm.net:31001/dashboard/api/v1/csrftoken/login
+curl -kv https://ajmfco42-01.ajm.net:31001/dashboard/api/v1/csrftoken/login
 
 curl -kv -X POST https://ajmfco42-01.ajm.net:31001/dashboard/api/v1/login \
   -H "Content-Type: application/json" \
