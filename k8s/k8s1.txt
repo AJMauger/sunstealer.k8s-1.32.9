@@ -176,7 +176,7 @@ metadata:
   namespace: kubernetes-dashboard
   annotations:
     konghq.com/preserve-host: "true"
-    konghq.com/regex-priority: "4"
+    konghq.com/regex-priority: "5"
     konghq.com/rewrite: /api/v1/csrftoken/$1
     konghq.com/strip-path: "true"
 spec:
@@ -204,7 +204,7 @@ metadata:
   namespace: kubernetes-dashboard
   annotations:
     konghq.com/preserve-host: "true"
-    konghq.com/regex-priority: "3"
+    konghq.com/regex-priority: "4"
     konghq.com/rewrite: /api/v1/login
     konghq.com/strip-path: "true"
 spec:
@@ -218,6 +218,34 @@ spec:
     http:
       paths:
       - path: /~/dashboard/api/v1/login(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: kubernetes-dashboard-auth
+            port:
+              number: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kubernetes-dashboard-auth-me
+  namespace: kubernetes-dashboard
+  annotations:
+    konghq.com/preserve-host: "true"
+    konghq.com/regex-priority: "3"
+    konghq.com/rewrite: /api/v1/me
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  tls:
+  - hosts:
+    - ajmfco42-01.ajm.net
+    secretName: kong-proxy-tls
+  rules:
+  - host: ajmfco42-01.ajm.net
+    http:
+      paths:
+      - path: /~/dashboard/api/v1/me(.*)
         pathType: ImplementationSpecific
         backend:
           service:
