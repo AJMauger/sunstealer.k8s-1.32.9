@@ -1,0 +1,125 @@
+# kubectl create namespace mongodb
+
+# kubectl -n mongodb create secret generic mongodb --from-literal=username= --from-literal=password=""
+
+---
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: mongodb
+  namespace: mongodb
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+#
+# [ajm@ajmfco42-01 sunstealer.identity]$ kubectl get storageclass
+# NAME      PROVISIONER                    RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+# mongodb   kubernetes.io/no-provisioner   Delete          WaitForFirstConsumer   false                  39d
+#
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mongodb
+  namespace: mongodb
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: mongodb
+  local:
+    path: /var/home/ajm/data
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                # kubectl get nodes --show-labels
+                - ajmfco42-02.ajm.net
+                - ajmfco42-03.ajm.net
+                - ajmfco42-04.ajm.net
+---
+# claim/allocate a part of PersistentVolume storage for POD.  MongoDB claiming 1Gi of 1Gi.
+#
+# [ajm@ajmfco42-01 sunstealer.identity]$ kubectl -n default get pvc
+# NAME      STATUS   VOLUME    CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+# mongodb   Bound    mongodb   1Gi        RWX            mongodb        39d
+#
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: mongodb
+  namespace: mongodb
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: mongodb
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb
+  name: mongodb
+  namespace: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - image: mongo
+          args: ["--dbpath", "/var/home/ajm/data"]
+          env:
+            - name: MONGO_INITDB_DATABASE
+              value: admin
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  key: username
+                  name: mongodb
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: mongodb
+          name: mongodb
+          ports:
+            - containerPort: 27017
+              name: w3
+          volumeMounts:
+            - name: mongodb # => deployment volume name
+              mountPath: "/var/home/ajm/data"
+      volumes:
+        - name: mongodb # deployment volume name
+          persistentVolumeClaim:
+            claimName: mongodb # => persistent volume claim => persistent volume
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb
+  name: mongodb
+  namespace: mongodb
+spec:
+  ports:
+    - protocol: TCP
+      name: mongodb
+      nodePort: 32017
+      port: 27017
+  selector:
+    app: mongodb
+  type: NodePort
